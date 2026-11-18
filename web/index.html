@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>용인시 실시간 빗물 지도</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Leaflet 핵심 스타일 — 위 CDN 스타일이 막힌 환경에서도 지도가 깨지지 않게 */
+/* Leaflet 핵심 스타일 — 위 CDN 스타일이 막힌 환경에서도 지도가 깨지지 않게 */
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}
+.leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent;outline:0}
+.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{user-select:none;-webkit-user-drag:none}
+.leaflet-tile{visibility:hidden}.leaflet-tile-loaded{visibility:inherit}
+.leaflet-container img.leaflet-tile,.leaflet-container img.leaflet-image-layer{max-width:none!important;max-height:none!important}
+.leaflet-image-layer{image-rendering:pixelated}
+.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
+.leaflet-zoom-animated{transform-origin:0 0}
+.leaflet-zoom-anim .leaflet-zoom-animated{transition:transform .25s cubic-bezier(0,0,.25,1)}
+.leaflet-interactive{cursor:pointer}.leaflet-grab{cursor:grab}.leaflet-dragging .leaflet-grab{cursor:move}
+.leaflet-control{position:relative;z-index:800;pointer-events:auto;float:left;clear:both}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}
+.leaflet-right .leaflet-control{float:right;margin-right:10px}.leaflet-left .leaflet-control{margin-left:10px}
+.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}
+.leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.4);border-radius:4px}
+.leaflet-bar a{background:#fff;border-bottom:1px solid #ccc;width:30px;height:30px;line-height:30px;display:block;text-align:center;text-decoration:none;color:#222;font:bold 18px 'Lucida Console',Monaco,monospace}
+.leaflet-bar a:last-child{border-bottom:none}
+.leaflet-control-attribution{background:rgba(255,255,255,.8);margin:0!important;padding:0 5px;font-size:11px;color:#333}
+.leaflet-control-attribution a{color:#0078a8}
+.leaflet-popup{position:absolute;text-align:center;margin-bottom:20px}
+.leaflet-popup-content-wrapper{padding:1px;text-align:left;border-radius:10px;background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.4)}
+.leaflet-popup-content{margin:12px 16px;line-height:1.4;min-width:150px}
+.leaflet-popup-tip-container{width:40px;height:20px;position:absolute;left:50%;margin-top:-1px;margin-left:-20px;overflow:hidden;pointer-events:none}
+.leaflet-popup-tip{width:17px;height:17px;padding:1px;margin:-10px auto 0;transform:rotate(45deg);background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.4)}
+.leaflet-popup-close-button{position:absolute;top:0;right:0;width:24px;height:24px;font:16px/24px Tahoma,Verdana,sans-serif;color:#757575;text-decoration:none;text-align:center}
+.leaflet-tooltip{position:absolute;padding:4px 8px;background:#fff;border:1px solid #fff;border-radius:4px;color:#222;white-space:nowrap;user-select:none;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+
+/* 페이지 */
+:root{--ink:#16202a;--muted:#5b6875;--line:#dde3e9;--bg:#f4f6f8;--card:#fff;--navy:#0f2233;--water:#1f5fd6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:'Noto Sans KR',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+.app{display:grid;grid-template-columns:1fr 390px;grid-template-rows:auto 1fr;height:100vh}
+header{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--navy);color:#fff;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:-.3px}
+header .time{font-size:13px;opacity:.85}
+header .live{width:8px;height:8px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.25)}
+header .live.stale{background:#f5a524;box-shadow:0 0 0 3px rgba(245,165,36,.25)}
+header .spacer{flex:1}
+header .replay{font-size:12px;font-weight:700;background:#f5a524;color:#0f2233;border-radius:999px;padding:3px 10px}
+header button.ref{white-space:nowrap;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer}
+.modes{display:flex;background:rgba(255,255,255,.1);border-radius:10px;padding:3px;gap:2px}
+.modes button{border:none;background:transparent;color:#cfd8e3;font:inherit;font-size:14px;font-weight:500;padding:6px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.modes button.on{background:#fff;color:var(--navy);font-weight:700}
+.modes button small{display:block;font-size:10px;font-weight:400;opacity:.75}
+.mapwrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#e9edf1}
+.leaflet-tile-pane{filter:grayscale(1) brightness(1.08) contrast(.9)}
+aside{overflow-y:auto;padding:14px;border-left:1px solid var(--line);background:var(--bg)}
+.demo{background:#fff4d6;border:1px solid #f0d58a;color:#6b5000;border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.55}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.card .top{display:flex;align-items:baseline;justify-content:space-between}
+.card h2{font-size:16px;margin:0}
+.badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef1f4;color:var(--muted)}
+.badge.l1{background:#dbefff;color:#0b5394}.badge.l2{background:#e3f7e1;color:#1d6b17}.badge.l3{background:#fff0c7;color:#8a5a00}.badge.l4{background:#ffe0dc;color:#a3221a}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.nums div{font-size:10.5px;color:var(--muted);line-height:1.3;display:flex;flex-direction:column;justify-content:space-between}
+.nums b{display:block;font-size:16px;color:var(--ink);font-weight:700;margin-top:2px}
+.nums b small{font-size:10px;font-weight:400;color:var(--muted)}
+.nums .hl b{color:var(--water)}
+.mix{margin-top:12px}
+.mix .row{display:grid;grid-template-columns:84px 1fr;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--muted)}
+.bar{display:flex;height:14px;border-radius:4px;overflow:hidden;background:#eef1f4}
+.bar span{height:100%}
+.keys{font-size:10.5px;color:var(--muted);margin:4px 0 0 90px}
+.keys i{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 3px 0 6px}
+.callout{font-size:12.5px;margin-top:8px;line-height:1.55}
+.callout b{color:#c0392b}
+.aws{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+svg.spark{display:block;width:100%;height:34px;margin-top:8px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;line-height:1.6}
+.panel h3{font-size:14px;margin:0 0 4px}
+.panel .sub{color:var(--muted);font-size:12px;margin-bottom:8px;line-height:1.55}
+.same .ctl{white-space:nowrap;display:flex;align-items:center;gap:8px;margin:6px 0 10px}
+.same .ctl input{flex:1;accent-color:var(--water)}
+.same .ctl b{min-width:58px;text-align:right;font-size:14px}
+.same .ctl button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer}
+.same .g{display:grid;grid-template-columns:58px 1fr 92px;align-items:center;gap:6px;margin:5px 0}
+.same .g .track{height:12px;background:#eef1f4;border-radius:3px;overflow:hidden}
+.same .g .track span{display:block;height:100%}
+.same .g .v{text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+.scale{display:flex;height:12px;border-radius:3px;overflow:hidden}
+.scale span{flex:1}
+.ticks{display:flex;font-size:10px;color:var(--muted);margin-top:3px}
+.ticks span{flex:1;min-width:0}
+.lclist{display:grid;grid-template-columns:1fr;gap:3px;margin-top:6px}
+.lclist button{display:flex;align-items:center;gap:7px;font:inherit;font-size:12px;border:1px solid transparent;background:none;border-radius:6px;padding:3px 6px;cursor:pointer;text-align:left;color:var(--ink)}
+.lclist button:hover{background:#f1f4f7}
+.lclist button.on{border-color:#0f2233;background:#eef3fb;font-weight:700}
+.lclist button.dim{opacity:.45}
+.lclist i{width:12px;height:12px;border-radius:2px;flex:none}
+.lclist small{color:var(--muted);margin-left:auto;font-weight:400}
+.note{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.65}
+details{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;font-weight:700;font-size:12.5px;color:var(--water)}
+details p,details li{font-size:12px;color:#33414e;line-height:1.65}
+details ul{padding-left:18px;margin:6px 0}
+.formula{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:#f4f6f8;border-radius:6px;padding:6px 8px;margin:6px 0}
+dl.gloss{margin:6px 0 0;font-size:12px}
+dl.gloss dt{font-weight:700;margin-top:6px}
+dl.gloss dd{margin:2px 0 0;color:#33414e}
+.dlabel{background:rgba(15,34,51,.86);color:#fff;border:none;font-size:12px;font-weight:500;box-shadow:none;text-align:center;line-height:1.35}
+.err{color:#a3221a;font-size:12px;margin-top:6px}
+.player{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;display:flex;align-items:center;gap:12px;
+  background:rgba(15,34,51,.92);color:#fff;border-radius:12px;padding:10px 14px;width:min(560px,calc(100% - 24px));box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.player button{flex:none;width:36px;height:36px;border-radius:50%;border:none;background:#fff;color:var(--navy);cursor:pointer;display:grid;place-items:center}
+.player button svg{width:16px;height:16px}
+.player .mid{flex:1;min-width:0}
+.player .lbl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
+.player .lbl b{font-size:14px}
+.player .tag{font-size:11px;padding:1px 7px;border-radius:999px;background:#3ddc84;color:var(--navy);font-weight:700}
+.player .tag.past{background:rgba(255,255,255,.18);color:#fff;font-weight:500}
+.player input[type=range]{width:100%;accent-color:#3ddc84;margin:0}
+.player .ends{display:flex;justify-content:space-between;font-size:10px;opacity:.75;margin-top:2px}
+.player .speed{flex:none;font-size:11px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:4px 6px;font-family:inherit}
+.maplegend{position:absolute;top:12px;left:12px;z-index:1000;background:rgba(255,255,255,.95);border-radius:10px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:11px;width:250px}
+.maplegend b{display:block;font-size:12px;margin-bottom:5px}
+.maplegend .stn{display:flex;align-items:center;gap:6px;margin-top:7px;padding-top:6px;border-top:1px solid var(--line)}
+.maplegend .stn i{width:11px;height:11px;border-radius:50%;border:2px solid #0f2233;background:#fff;flex:none}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto 62vh auto;height:auto}
+  aside{border-left:none;border-top:1px solid var(--line)}
+  header{gap:8px}header h1{font-size:16px}header .time{font-size:11px}
+  .modes{order:5;width:100%;justify-content:space-between}.modes button{flex:1;padding:6px 4px}
+  .player{bottom:12px;gap:8px;padding:8px 10px}.player .speed{display:none}
+  .maplegend{display:none}
+  .same .ctl{flex-wrap:wrap}.same .ctl span{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="live" id="live"></span>
+    <h1>용인시 실시간 빗물 지도</h1>
+    <span class="time" id="time">불러오는 중…</span>
+    <span class="replay" id="replay" hidden>과거 자료 다시 보기</span>
+    <span class="spacer"></span>
+    <div class="modes" role="tablist" aria-label="지도 보기">
+      <button type="button" data-mode="rain">비<small>지금 얼마나 오나</small></button>
+      <button type="button" data-mode="landcover">땅<small>어떤 땅인가</small></button>
+      <button type="button" data-mode="runoff" class="on">흘러간 빗물<small>얼마나 흘러가나</small></button>
+    </div>
+    <button class="ref" id="refresh" type="button">새로고침</button>
+  </header>
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="maplegend" id="maplegend"></div>
+    <div class="player" id="player" hidden>
+      <button id="play" type="button" aria-label="재생/정지"></button>
+      <div class="mid">
+        <div class="lbl"><span>관측 <b id="ftime">--:--</b></span><span class="tag" id="ftag">최신</span></div>
+        <input type="range" id="slider" min="0" max="0" value="0" aria-label="레이더 관측 시각">
+        <div class="ends"><span id="fstart"></span><span id="fcap"></span><span id="fend"></span></div>
+      </div>
+      <select class="speed" id="speed" aria-label="재생 속도">
+        <option value="1000">느리게</option><option value="600" selected>보통</option><option value="300">빠르게</option>
+      </select>
+    </div>
+  </div>
+  <aside>
+    <div id="demo" class="demo" hidden>
+      <b>미리보기 화면입니다.</b> 비구름과 관측소 값은 시험용 가짜 자료이고, 땅 정보와 구 경계는 실제 자료입니다.
+      (이 미리보기에서는 바탕 지도가 안 보일 수 있습니다.)
+    </div>
+    <div id="cards"></div>
+    <div class="panel same" id="same">
+      <h3>비가 똑같이 와도, 땅마다 달라요</h3>
+      <div class="sub">용인시 전체에 같은 양의 비가 내린다면 땅 종류마다 빗물이 얼마나 흘러갈까요? 막대를 움직여 보세요.</div>
+      <div class="ctl"><span>최근 3시간 내린 비</span><input type="range" id="sameP" min="0" max="150" step="1" value="50" aria-label="최근 3시간 내린 비"><b id="samePv">50 mm</b><button type="button" id="sameNow">지금 값</button></div>
+      <div id="sameBars"></div>
+    </div>
+    <div class="panel legend">
+      <h3 id="legTitle">범례</h3>
+      <div id="legBody"></div>
+    </div>
+    <div class="panel">
+      <h3>흘러간 빗물은 어떻게 계산하나요?</h3>
+      <p style="margin:4px 0">땅은 비를 맞으면 처음 얼마간은 <b>머금어서</b> 빗물이 흘러가지 않아요. 머금을 수 있는 양을 넘으면 흘러가기 시작하고, 땅이 젖을수록 흘러가는 비율이 점점 커져요.
+      땅마다 머금는 힘이 달라서, 같은 비가 와도 숲보다 도시에서 빗물이 훨씬 많이 흘러가요.</p>
+      <p style="margin:6px 0 0">이 지도는 땅마다 <b>빗물 흘림 점수(CN)</b>를 매기고, 최근 3시간 동안 레이더로 본 비의 양과 함께 계산해요.</p>
+      <details>
+        <summary>빗물 흘림 점수(CN)란?</summary>
+        <p>땅이 빗물을 얼마나 흘려보내는지를 <b>0~100 점수</b>로 나타낸 값이에요. 100이면 내린 비가 모두 흘러가고, 낮을수록 땅에 잘 스며들어요.</p>
+        <ul id="cnExamples"></ul>
+        <p>점수는 국토교통부 「홍수량 산정 표준지침」(2019)에 나온 우리나라 기준값을 썼어요.</p>
+      </details>
+      <details>
+        <summary>계산 방법(SCS-CN 방법) 자세히</summary>
+        <p>미국 농무부 토양보존국(SCS, 지금의 NRCS)이 만든 계산법으로, <b>내린 비의 양</b>과 <b>빗물 흘림 점수(CN)</b>만으로 흘러간 빗물의 양을 구해요. 우리나라 홍수 계산 기준에서도 쓰는 방법이에요.</p>
+        <div class="formula">흘러간 빗물 = (비 − 처음 머금는 양)² ÷ (비 − 처음 머금는 양 + 최대로 머금는 양)<br>
+        최대로 머금는 양 = 25400 ÷ CN − 254 (mm) · 처음 머금는 양 = 그 값의 20%</div>
+        <p>예) 숲(점수 72)은 비가 약 20 mm 올 때까지, 도로(점수 89)는 약 6 mm 올 때까지 빗물이 흘러가지 않아요.</p>
+        <p id="modelNote"></p>
+      </details>
+      <details>
+        <summary>용어 풀이</summary>
+        <dl class="gloss">
+          <dt>레이더로 본 비</dt><dd>기상청 레이더가 하늘의 비구름을 보고 <b>추정</b>한 비의 세기예요. 가로세로 500 m 네모 칸 단위로 관측해서 지도에서 네모나게 보여요.</dd>
+          <dt>지상 관측소 (AWS)</dt><dd>기상청이 땅 위에 설치한 자동 관측 장비예요. 빗물을 직접 받아서 <b>실제로 잰</b> 값이라 레이더 값이 맞는지 비교할 수 있어요.</dd>
+          <dt>비의 세기 (시간당 mm)</dt><dd>지금처럼 비가 1시간 동안 계속 오면 쌓일 물의 높이예요. 3 미만은 약한 비, 3~15는 보통 비, 15~30은 강한 비, 30 이상은 매우 강한 비예요.</dd>
+          <dt>최근 3시간 내린 비 (mm)</dt><dd>보고 있는 시각부터 거꾸로 3시간 동안 내린 비를 모두 더해, 구 전체에 고르게 펼친 물의 높이예요.</dd>
+          <dt>흘러간 빗물 (mm)</dt><dd>내린 비 중 땅에 스며들지 않고 흘러간 양이에요. 1 mm는 땅 1 m²마다 물 1 L예요.</dd>
+          <dt>흘러간 비율</dt><dd>최근 3시간 내린 비 중 흘러간 빗물의 비율이에요.</dd>
+          <dt>땅이 젖은 정도</dt><dd>최근 5일 동안 비가 많이 왔으면 땅이 젖어 있어서 빗물이 더 잘 흘러가요. 이걸 반영해 점수를 조정해요.</dd>
+        </dl>
+      </details>
+      <div class="note">자료: 기상청 API허브(레이더·지상 관측소), 환경부 토지피복지도</div>
+      <div class="err" id="err"></div>
+    </div>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const REFRESH_MS = 5 * 60 * 1000;
+const HOLD_LAST_MS = 2000;
+const LEVEL = {'없음':'', '약한 비':'l1', '보통 비':'l2', '강한 비':'l3', '매우 강한 비':'l4'};
+const DCOLORS = {'수지구':'#1f6feb','기흥구':'#d9480f','처인구':'#2b8a3e'};
+const ICON_PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 16 16"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z" fill="currentColor"/></svg>';
+// 시민용 땅 이름 (괄호 안은 환경부 토지피복 분류 이름)
+const PLAIN = {'시가화건조지역':'도시','농업지역':'논·밭','산림지역':'숲','초지':'풀밭','습지':'습지','나지':'맨땅','수역':'강·호수'};
+const PLAIN_DESC = {'시가화건조지역':'집·건물·도로','농업지역':'논·밭·과수원·비닐하우스','산림지역':'활엽수·침엽수·섞인 숲',
+  '초지':'잔디밭·들판','습지':'물가의 젖은 땅','나지':'공사장·자갈밭처럼 풀 없는 땅','수역':'하천·저수지'};
+const WATERY = new Set(['수역', '습지']);  // 내린 비가 그대로 흘러간 것으로 계산되는 곳은 비교에서 뺀다
+
+const map = L.map('map', {zoomSnap: 0.5});
+// 바탕 지도: 오픈스트리트맵 (키 필요 없음). 빗물 색이 잘 보이게 회색조로 표시
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자 | 기상청 · 환경부 토지피복지도'
+}).addTo(map);
+
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 1) => v == null ? '–' : Number(v).toFixed(d);
+const hm = t => t ? t.slice(11, 16) : '--:--';
+const bust = () => '?t=' + Date.now();
+async function getJSON(url) {
+  const r = await fetch(url + bust(), {cache: 'no-store'});
+  if (!r.ok) throw new Error(url + ' ' + r.status);
+  return r.json();
+}
+function minus3h(t) {
+  const d = new Date(t.replace(' ', 'T') + ':00+09:00');
+  d.setHours(d.getHours() - 3);
+  return d.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul'});
+}
+
+let latest = null, history = [], lc = null;
+let mode = 'runoff', pick = '시가화건조지역';   // 땅 보기에서 고른 종류 (null이면 전체)
+let frames = [], ov = {rain: {}, runoff: {}}, lcLayer = null, lcImg = null, lcUrls = {}, idx = 0;
+let districtLayer = null, labels = {}, stationLayer = L.layerGroup().addTo(map), fitted = false;
+let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, timer = null;
+let sameTouched = false;
+
+// SCS-CN (파이썬 runoff.py 와 같은 식)
+function scsQ(P, cn) {
+  if (cn >= 100) return P;
+  const S = 25400 / cn - 254, Ia = 0.2 * S;
+  return P > Ia ? (P - Ia) ** 2 / (P - Ia + S) : 0;
+}
+function colorOf(v, scale) {
+  if (v == null || v < scale[0][0]) return '#ffffff';
+  let c = scale[0][1];
+  for (const [lo, col] of scale) if (v >= lo) c = col;
+  return c;
+}
+const groupColor = g => latest.model.groups.find(x => x.g === g)?.color || '#999';
+
+// ---- 땅 그림: 고른 종류만 진하게 ----
+function lcImageFor(group) {
+  const key = group || 'all';
+  if (lcUrls[key]) return lcUrls[key];
+  if (!lcImg || !group) return 'data/landcover.png';
+  const c = document.createElement('canvas');
+  c.width = lcImg.naturalWidth; c.height = lcImg.naturalHeight;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(lcImg, 0, 0);
+  const im = ctx.getImageData(0, 0, c.width, c.height), px = im.data;
+  const keep = new Set(lc.classes.filter(x => x.group === group).map(x => x.color.toLowerCase()));
+  const hex = (r, g, b) => '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+  for (let i = 0; i < px.length; i += 4) {
+    if (!px[i + 3]) continue;
+    if (!keep.has(hex(px[i], px[i + 1], px[i + 2]))) { px[i] = px[i + 1] = px[i + 2] = 205; px[i + 3] = 150; }
+  }
+  ctx.putImageData(im, 0, 0);
+  return (lcUrls[key] = c.toDataURL('image/png'));
+}
+
+// ---- 카드 ----
+function spark(series, color, markT) {
+  const pts = series.map(h => h.v);
+  if (pts.length < 2) return '';
+  const w = 300, h = 34, max = Math.max(0.5, ...pts.map(p => p ?? 0));
+  const X = i => i / (pts.length - 1) * w;
+  const xy = pts.map((p, i) => [X(i), h - 3 - (p ?? 0) / max * (h - 8)]);
+  const line = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const mi = series.findIndex(s => s.t === markT);
+  const mark = mi < 0 ? '' : `<line x1="${X(mi)}" x2="${X(mi)}" y1="0" y2="${h}" stroke="#0f2233" stroke-width="1.5" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`;
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <path d="${line} L${w} ${h} L0 ${h} Z" fill="${color}" opacity=".12"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>${mark}</svg>`;
+}
+function mixBar(groups, key) {
+  return `<div class="bar">${groups.filter(g => (g[key] || 0) > 0.05)
+    .map(g => `<span title="${PLAIN[g.g]} ${fmt(g[key])}%" style="width:${g[key]}%;background:${groupColor(g.g)}"></span>`).join('')}</div>`;
+}
+function callout(d) {
+  if (!d.q3h || d.q3h < 0.05) return `<div class="callout">아직 흘러간 빗물이 거의 없어요. 땅이 비를 머금고 있는 중이에요.</div>`;
+  // 도시가 면적보다 많은 빗물을 냈으면 도시를, 아니면 비중 차이가 가장 큰 땅을 보여준다
+  const cand = [...d.groups].filter(x => x.area_pct > 1 && x.q_pct != null && !WATERY.has(x.g));
+  const city = cand.find(x => x.g === '시가화건조지역' && x.q_pct > x.area_pct);
+  const g = city || cand.sort((a, b) => b.q_pct / b.area_pct - a.q_pct / a.area_pct)[0];
+  if (!g || g.q_pct <= g.area_pct) return '';
+  return `<div class="callout">${d.name} 땅의 ${fmt(g.area_pct, 0)}%인 <b>${PLAIN[g.g]}</b>에서 흘러간 빗물의 <b>${fmt(g.q_pct, 0)}%</b>가 나왔어요.</div>`;
+}
+function renderCards(frame) {
+  const fd = Object.fromEntries(frame.districts.map(d => [d.name, d]));
+  const isLast = frame === frames.at(-1);
+  const from = minus3h(frame.t), to = hm(frame.t);
+  $('cards').innerHTML = latest.districts.map(ld => {
+    const d = fd[ld.name] || ld;
+    const color = DCOLORS[d.name] || '#333';
+    const series = mode === 'rain'
+      ? history.map(h => ({t: h.t, v: h.v[d.name]}))
+      : history.map(h => ({t: h.t, v: (h.q || {})[d.name]}));
+    const shown = d.groups.filter(g => g.area_pct > 3);
+    const aws = ld.aws_n
+      ? `지상 관측소 ${ld.aws_n}곳에서 잰 최근 1시간 비: 평균 <b>${fmt(ld.aws_rn60_mean)} mm</b> (${hm(latest.radar_time)})`
+      : '구 안에 지상 관측소 없음';
+    return `<div class="card">
+      <div class="top"><h2 style="color:${color}">${d.name}</h2><span class="badge ${LEVEL[d.label] || ''}">${d.label === '없음' || !d.label ? '비 없음' : d.label}</span></div>
+      <div class="nums">
+        <div>지금 비의 세기<b>${fmt(d.mean)} <small>mm/시간</small></b></div>
+        <div>최근 3시간 내린 비<b>${fmt(d.p3h)} <small>mm</small></b></div>
+        <div class="hl">흘러간 빗물<b>${fmt(d.q3h, 1)} <small>mm</small></b></div>
+        <div class="hl">흘러간 비율<b>${fmt(d.ratio, 0)} <small>%</small></b></div>
+      </div>
+      <div class="note" style="margin-top:4px">최근 3시간 = ${from}~${to}${isLast ? '' : ' (재생 중인 시각)'}</div>
+      <div class="mix">
+        <div class="row"><span>땅 구성</span>${mixBar(d.groups, 'area_pct')}</div>
+        <div class="row"><span>빗물이 나온 곳</span>${d.q3h > 0.05 ? mixBar(d.groups, 'q_pct') : '<div class="bar"></div>'}</div>
+        <div class="keys">${shown.map(g => `<i style="background:${groupColor(g.g)}"></i>${PLAIN[g.g]}`).join('')}</div>
+      </div>
+      ${callout(d)}
+      ${spark(series, mode === 'rain' ? '#2a8cff' : color, frame.t)}
+      <div class="aws">${mode === 'rain' ? '그래프: 비의 세기 변화' : '그래프: 흘러간 빗물 변화'}<br>${aws}</div>
+    </div>`;
+  }).join('');
+}
+
+// ---- 같은 비, 다른 땅 ----
+function renderSame(P) {
+  $('samePv').textContent = `${P} mm`;
+  const cnBy = Object.fromEntries(latest.model.classes.map(c => [c.code, c.cn]));
+  const rows = latest.model.groups.map(({g, color}) => {
+    const cls = lc.classes.filter(c => c.group === g && c.km2 > 0);
+    const A = cls.reduce((s, c) => s + c.km2, 0);
+    const Q = A ? cls.reduce((s, c) => s + c.km2 * scsQ(P, cnBy[c.code]), 0) / A : 0;
+    return {g, color, Q, r: P ? Q / P * 100 : 0, A};
+  }).filter(x => x.A > 0.5);
+  $('sameBars').innerHTML = rows.map(x => `<div class="g"><span title="${PLAIN_DESC[x.g]}">${PLAIN[x.g]}</span>
+    <div class="track"><span style="width:${x.r.toFixed(1)}%;background:${x.color}"></span></div>
+    <span class="v">${x.Q.toFixed(1)} mm · ${x.r.toFixed(0)}%</span></div>`).join('')
+    + `<div class="note">숫자 = 흘러간 빗물(mm) · 흘러간 비율. 막대 길이 = 흘러간 비율. 강·호수와 습지는 물 위라 내린 비가 모두 흘러간 것으로 계산해요.</div>`;
+}
+
+// ---- 범례 ----
+function scaleHtml(sc, unit) {
+  return `<div class="scale">${sc.map(c => `<span style="background:${c[1]}"></span>`).join('')}</div>
+    <div class="ticks">${sc.map(c => `<span>${c[0]}</span>`).join('')}</div>${unit ? `<div class="note" style="margin-top:3px">${unit}</div>` : ''}`;
+}
+const STN = `<div class="stn"><i></i><span>지상 관측소 (누르면 실제로 잰 비)</span></div>`;
+function renderLegend() {
+  const m = latest.model;
+  let html = '', mini = '';
+  if (mode === 'rain') {
+    $('legTitle').textContent = '비의 세기 (시간당 mm)';
+    html = scaleHtml(m.rain_colors, '3 미만 약한 비 · 3~15 보통 비 · 15~30 강한 비 · 30 이상 매우 강한 비. 레이더는 500 m 네모 칸 단위로 관측해서 네모나게 보여요.');
+    mini = `<b>비의 세기 (시간당 mm)</b>` + scaleHtml(m.rain_colors, '') + STN;
+  } else if (mode === 'runoff') {
+    $('legTitle').textContent = '흘러간 빗물 (mm)';
+    html = scaleHtml(m.runoff_colors, '장면마다, 그 시각까지 최근 3시간 동안 땅에 스며들지 않고 흘러간 빗물의 양이에요. 도로와 건물이 많은 곳일수록 진하게 나타나요.');
+    mini = `<b>흘러간 빗물 (최근 3시간, mm)</b>` + scaleHtml(m.runoff_colors, '') + STN;
+  } else {
+    $('legTitle').textContent = '땅 종류 · 빗물 흘림 점수';
+    const items = m.groups.map(({g, color}) => {
+      const cns = m.classes.filter(c => c.group === g).map(c => c.cn);
+      const lo = Math.min(...cns), hi = Math.max(...cns);
+      const cls = pick === g ? 'on' : pick ? 'dim' : '';
+      return `<button type="button" class="${cls}" data-g="${g}" title="${PLAIN_DESC[g]} (${g})"><i style="background:${color}"></i>${PLAIN[g]}<small>점수 ${lo === hi ? lo : lo + '~' + hi}</small></button>`;
+    }).join('');
+    const all = `<button type="button" class="${pick ? 'dim' : 'on'}" data-g=""><i style="background:linear-gradient(90deg,#e74c3c,#f1c40f,#1e8449,#2e86c1)"></i>모든 땅 보기</button>`;
+    html = `<div class="note" style="margin:0 0 4px">땅 종류를 누르면 지도에서 그 땅만 진하게 보여요. 점수가 높을수록 빗물이 많이 흘러가요(최대 100).</div><div class="lclist">${all}${items}</div>`;
+    mini = `<b>땅 종류 (눌러서 골라보기)</b><div class="lclist">${all}${items}</div>` + STN;
+  }
+  $('legBody').innerHTML = html;
+  $('maplegend').innerHTML = mini;
+  document.querySelectorAll('.lclist button').forEach(b => b.addEventListener('click', () => {
+    pick = b.dataset.g || null; renderLegend(); showFrame(idx);
+  }));
+  $('cnExamples').innerHTML = ['산림지역', '농업지역', '시가화건조지역', '수역'].map(g => {
+    const cs = m.classes.filter(c => c.group === g);
+    return `<li>${PLAIN[g]}: ${[...new Set(cs.map(c => c.cn))].join('·')}점</li>`;
+  }).join('') + `<li>세부: 주택가 ${m.classes.find(c => c.code === '110')?.cn}점, 도로 ${m.classes.find(c => c.code === '150')?.cn}점, 논 ${m.classes.find(c => c.code === '210')?.cn}점</li>`;
+  $('modelNote').innerHTML = `지금 계산 조건: 흙의 종류는 용인 전체를 '보통 흙'(B군)으로 가정했어요(토양 지도 미반영).
+    땅이 젖은 정도는 ${m.amc === 'I' ? '마른 편' : m.amc === 'III' ? '젖은 편' : '보통'}으로 계산했어요(${m.amc_note}).
+    레이더 비는 하늘에서 추정한 값(${latest.zr})이라 지상 관측소 값과 다를 수 있어요.`;
+}
+
+// ---- 지도 ----
+function labelText(d) {
+  if (mode === 'rain') return `${d.name}<br>${fmt(d.mean)} mm/시간`;
+  if (mode === 'runoff') return `${d.name}<br>흘러간 빗물 ${fmt(d.q3h, 1)} mm`;
+  if (!pick) {
+    const top = [...d.groups].sort((a, b) => b.area_pct - a.area_pct)[0];
+    return `${d.name}<br>${PLAIN[top.g]} ${fmt(top.area_pct, 0)}%`;
+  }
+  const g = d.groups.find(x => x.g === pick);
+  return `${d.name}<br>${PLAIN[pick]} ${fmt(g?.area_pct, 0)}%`;
+}
+function applyVisibility() {
+  const f = frames[idx];
+  for (const kind of ['rain', 'runoff']) {
+    for (const [file, layer] of Object.entries(ov[kind])) {
+      layer.setOpacity(mode === kind && f && f[kind] === file ? (kind === 'rain' ? 0.82 : 0.95) : 0);
+    }
+  }
+  if (lcLayer) {
+    if (mode === 'landcover') lcLayer.setUrl(lcImageFor(pick));
+    else lcLayer.setUrl(lcImageFor(null));
+    lcLayer.setOpacity(mode === 'landcover' ? 0.92 : mode === 'runoff' ? 0.28 : 0);
+  }
+  if (districtLayer) districtLayer.bringToFront();
+}
+function showFrame(i) {
+  if (!frames.length) return;
+  idx = Math.max(0, Math.min(i, frames.length - 1));
+  const f = frames[idx];
+  applyVisibility();
+  const isLast = idx === frames.length - 1;
+  $('slider').value = idx;
+  $('ftime').textContent = hm(f.t);
+  const ago = Math.round((new Date(latest.radar_time.replace(' ', 'T')) - new Date(f.t.replace(' ', 'T'))) / 60000);
+  $('ftag').textContent = isLast ? '최신' : `${ago}분 전`;
+  $('ftag').classList.toggle('past', !isLast);
+  for (const d of f.districts) if (labels[d.name]) labels[d.name].setTooltipContent(labelText(d));
+  renderCards(f);
+  if (!sameTouched) {
+    const P = Math.round(f.p3h_city ?? 0);
+    $('sameP').value = P >= 5 ? P : 50;
+    renderSame(+$('sameP').value);
+  }
+}
+function schedule() {
+  clearTimeout(timer);
+  if (!playing || frames.length < 2) return;
+  const last = idx === frames.length - 1;
+  timer = setTimeout(() => { showFrame(last ? 0 : idx + 1); schedule(); }, last ? HOLD_LAST_MS : +$('speed').value);
+}
+function setPlaying(p) {
+  playing = p;
+  $('play').innerHTML = p ? ICON_PAUSE : ICON_PLAY;
+  $('play').setAttribute('aria-label', p ? '정지' : '재생');
+  schedule();
+}
+const CAPTION = {rain: '최근 1시간 레이더 관측', runoff: '각 장면: 그 시각까지 최근 3시간 흘러간 빗물', landcover: '땅은 그대로 · 오른쪽 숫자만 바뀜'};
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.modes button').forEach(b => {
+    b.classList.toggle('on', b.dataset.mode === m);
+    b.setAttribute('aria-selected', b.dataset.mode === m);
+  });
+  $('fcap').textContent = CAPTION[m];
+  renderLegend();
+  showFrame(idx);
+}
+function syncFrames(list) {
+  const wasLast = !frames.length || idx === frames.length - 1;
+  for (const kind of ['rain', 'runoff']) {
+    const want = new Set(list.map(f => f[kind]));
+    for (const [file, layer] of Object.entries(ov[kind])) {
+      if (!want.has(file)) { map.removeLayer(layer); delete ov[kind][file]; }
+    }
+    for (const f of list) {
+      if (!ov[kind][f[kind]]) {
+        const b = kind === 'rain' ? latest.bounds : latest.lc_bounds;
+        ov[kind][f[kind]] = L.imageOverlay('data/' + f[kind] + bust(), b, {opacity: 0}).addTo(map);
+      }
+    }
+  }
+  const curT = frames[idx]?.t;
+  frames = list;
+  $('slider').max = Math.max(0, frames.length - 1);
+  $('fstart').textContent = hm(frames[0]?.t);
+  $('fend').textContent = hm(frames.at(-1)?.t);
+  $('player').hidden = frames.length < 2;
+  const keep = frames.findIndex(f => f.t === curT);
+  showFrame(wasLast || keep < 0 ? frames.length - 1 : keep);
+}
+function renderStations() {
+  stationLayer.clearLayers();
+  for (const s of latest.stations) {
+    L.circleMarker([s.lat, s.lon], {radius: 6, weight: 2, color: '#0f2233',
+      fillColor: colorOf(s.rn60, latest.model.rain_colors), fillOpacity: 1})
+      .bindPopup(`<b>지상 관측소 · ${s.name || s.stn}</b><br>
+        <span style="color:#5b6875">${s.district || '용인시 밖'} · ${s.time || ''} 측정</span><br>
+        최근 1시간 비 <b>${fmt(s.rn60)} mm</b> (15분 ${fmt(s.rn15)} mm)<br>
+        오늘 내린 비 ${fmt(s.rnday)} mm · ${s.rain_now ? '지금 비 오는 중' : '지금 비 안 옴'}<br>
+        기온 ${fmt(s.ta)}℃ · 습도 ${fmt(s.hm, 0)}% · 바람 ${fmt(s.ws)} m/s`).addTo(stationLayer);
+  }
+}
+async function load() {
+  try {
+    [latest, history] = await Promise.all([getJSON('data/latest.json'), getJSON('data/history.json').catch(() => [])]);
+    if (!lc) {
+      lc = await getJSON('data/landcover.json');
+      lcLayer = L.imageOverlay('data/landcover.png', latest.lc_bounds, {opacity: 0}).addTo(map);
+      lcImg = new Image();
+      lcImg.onload = () => { lcUrls = {}; if (mode === 'landcover') applyVisibility(); };
+      lcImg.src = 'data/landcover.png';
+    }
+    if (!districtLayer) {
+      const gj = await getJSON('data/districts.geojson').catch(() => getJSON('data/districts.json'));
+      districtLayer = L.geoJSON(gj, {
+        style: f => ({color: DCOLORS[f.properties.name] || '#333', weight: 2.5, fill: true, fillOpacity: 0}),
+        onEachFeature: (f, layer) => {
+          labels[f.properties.name] = layer.bindTooltip(f.properties.name, {permanent: true, direction: 'center', className: 'dlabel'});
+        }
+      }).addTo(map);
+    }
+    if (!fitted) {
+      const wide = window.innerWidth > 900;  // 넓은 화면에서는 왼쪽 위 범례에 가리지 않게 여백
+      map.fitBounds(districtLayer.getBounds(), wide ? {paddingTopLeft: [270, 20], paddingBottomRight: [20, 90]} : {padding: [16, 16]});
+      fitted = true;
+    }
+    $('fcap').textContent = CAPTION[mode];
+    renderLegend();
+    syncFrames(latest.frames);
+    renderStations();
+    $('time').textContent = `레이더 ${latest.radar_time} 기준`;
+    $('demo').hidden = !latest.demo;
+    const age = (Date.now() - new Date(latest.radar_time.replace(' ', 'T') + ':00+09:00')) / 60000;
+    $('replay').hidden = !latest.replay;
+    $('live').classList.toggle('stale', !latest.demo && !latest.replay && age > 30);
+    const errs = [];
+    if (latest.aws_error) errs.push('지상 관측소 자료를 받지 못했어요: ' + latest.aws_error);
+    if (latest.missing?.length) errs.push(`레이더 ${latest.missing.length}장면이 빠져 앞 장면 값으로 채웠어요`);
+    if (!latest.demo && !latest.replay && age > 30) errs.push('자료가 30분 넘게 갱신되지 않았어요');
+    $('err').textContent = errs.join(' · ');
+    schedule();
+  } catch (e) {
+    $('err').textContent = '자료를 불러오지 못했어요: ' + e.message;
+  }
+}
+document.querySelectorAll('.modes button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('play').addEventListener('click', () => setPlaying(!playing));
+$('slider').addEventListener('input', e => { setPlaying(false); showFrame(+e.target.value); });
+$('speed').addEventListener('change', schedule);
+$('refresh').addEventListener('click', load);
+$('sameP').addEventListener('input', e => { sameTouched = true; renderSame(+e.target.value); });
+$('sameNow').addEventListener('click', () => { sameTouched = false; showFrame(idx); });
+document.addEventListener('keydown', e => {
+  if (['INPUT', 'SELECT', 'BUTTON'].includes(e.target.tagName)) return;
+  if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+  if (e.key === 'ArrowLeft') { setPlaying(false); showFrame(idx - 1); }
+  if (e.key === 'ArrowRight') { setPlaying(false); showFrame(idx + 1); }
+});
+setPlaying(playing);
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>
