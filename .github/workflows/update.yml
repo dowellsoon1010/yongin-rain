@@ -1,0 +1,60 @@
+name: 강수·유출 지도 갱신
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # 10분마다 (GitHub 사정으로 몇 분 늦어질 수 있음)
+  workflow_dispatch:          # Actions 탭에서 손으로 실행
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - run: pip install -r pipeline/requirements.txt
+
+      # 지난 실행에서 받아둔 레이더(최근 4시간)와 선행강우 기록을 이어받는다
+      - name: 이전 상태 불러오기
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+
+      - name: 기상청 자료 받아 강수·유출 계산
+        env:
+          KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
+          SOIL_GROUP: ${{ vars.SOIL_GROUP || 'B' }}
+        run: python pipeline/fetch.py
+
+      - name: 상태 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deploy
+        uses: actions/deploy-pages@v4
